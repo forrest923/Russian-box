@@ -477,32 +477,6 @@
                         }
                     }
                     
-                    // 绘制阴影
-                    this.drawGhost();
-                }
-            }
-            
-            drawGhost() {
-                let ghostY = this.currentPiece.y;
-                while (!this.collision(this.currentPiece, this.currentPiece.x, ghostY + 1)) {
-                    ghostY++;
-                }
-                
-                if (ghostY !== this.currentPiece.y) {
-                    this.ctx.globalAlpha = 0.3;
-                    for (let row = 0; row < this.currentPiece.shape.length; row++) {
-                        for (let col = 0; col < this.currentPiece.shape[row].length; col++) {
-                            if (this.currentPiece.shape[row][col]) {
-                                this.drawBlock(
-                                    this.ctx,
-                                    this.currentPiece.x + col,
-                                    ghostY + row,
-                                    this.currentPiece.color
-                                );
-                            }
-                        }
-                    }
-                    this.ctx.globalAlpha = 1;
                 }
             }
             
