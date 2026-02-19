@@ -217,6 +217,7 @@
                     <div>P 暂停</div>
                 </div>
                 <button class="btn" onclick="game.restart()">新游戏</button>
+                <button class="btn" onclick="toggleSound()" id="soundBtn">🔊 声音: 开</button>
             </div>
         </div>
     </div>
@@ -283,6 +284,93 @@
             }
         }
         
+        // 音频管理器
+        class SoundManager {
+            constructor() {
+                this.audioContext = null;
+                this.enabled = true;
+                this.initAudio();
+            }
+            
+            initAudio() {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn('Web Audio API not supported');
+                }
+            }
+            
+            resumeContext() {
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+            }
+            
+            playTone(frequency, duration, type = 'sine', volume = 0.3) {
+                if (!this.enabled || !this.audioContext) return;
+                
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = type;
+                
+                gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + duration);
+            }
+            
+            playMove() {
+                this.resumeContext();
+                this.playTone(200, 0.05, 'sine', 0.15);
+            }
+            
+            playRotate() {
+                this.resumeContext();
+                this.playTone(400, 0.08, 'sine', 0.2);
+            }
+            
+            playDrop() {
+                this.resumeContext();
+                this.playTone(150, 0.1, 'square', 0.25);
+            }
+            
+            playClear(lines) {
+                this.resumeContext();
+                const baseFreq = 300;
+                for (let i = 0; i < lines; i++) {
+                    setTimeout(() => {
+                        this.playTone(baseFreq + i * 100, 0.15, 'sine', 0.3);
+                    }, i * 80);
+                }
+            }
+            
+            playGameOver() {
+                this.resumeContext();
+                const notes = [300, 250, 200, 150];
+                notes.forEach((freq, i) => {
+                    setTimeout(() => {
+                        this.playTone(freq, 0.3, 'sawtooth', 0.4);
+                    }, i * 150);
+                });
+            }
+            
+            playHardDrop() {
+                this.resumeContext();
+                this.playTone(100, 0.15, 'square', 0.3);
+            }
+            
+            toggle() {
+                this.enabled = !this.enabled;
+                return this.enabled;
+            }
+        }
+
         class Tetris {
             constructor() {
                 this.canvas = document.getElementById('gameCanvas');
@@ -303,6 +391,8 @@
                 this.dropCounter = 0;
                 this.dropInterval = 1000;
                 this.lastTime = 0;
+                
+                this.sounds = new SoundManager();
                 
                 this.init();
             }
@@ -381,6 +471,8 @@
                     this.dropInterval = Math.max(100, 1000 - (this.level - 1) * 100);
                     this.updateScore();
                 }
+                
+                return linesCleared;
             }
             
             update(time = 0) {
@@ -404,8 +496,12 @@
                 if (!this.collision(this.currentPiece, this.currentPiece.x, this.currentPiece.y + 1)) {
                     this.currentPiece.y++;
                 } else {
+                    this.sounds.playDrop();
                     this.merge();
-                    this.clearLines();
+                    const lines = this.clearLines();
+                    if (lines > 0) {
+                        this.sounds.playClear(lines);
+                    }
                     this.spawnPiece();
                 }
             }
@@ -415,6 +511,7 @@
                     this.currentPiece.y++;
                     this.score += 2;
                 }
+                this.sounds.playHardDrop();
                 this.drop();
                 this.updateScore();
             }
@@ -422,6 +519,7 @@
             move(dir) {
                 if (!this.collision(this.currentPiece, this.currentPiece.x + dir, this.currentPiece.y)) {
                     this.currentPiece.x += dir;
+                    this.sounds.playMove();
                 }
             }
             
@@ -429,6 +527,7 @@
                 const newShape = this.currentPiece.rotate();
                 if (!this.collision(this.currentPiece, this.currentPiece.x, this.currentPiece.y, newShape)) {
                     this.currentPiece.shape = newShape;
+                    this.sounds.playRotate();
                 }
             }
             
@@ -571,6 +670,7 @@
             
             endGame() {
                 this.gameOver = true;
+                this.sounds.playGameOver();
                 document.getElementById('finalScore').textContent = this.score;
                 document.getElementById('gameOver').style.display = 'block';
             }
@@ -592,6 +692,12 @@
                 this.spawnPiece();
                 this.update(0);
             }
+        }
+        
+        // 声音开关
+        function toggleSound() {
+            const enabled = game.sounds.toggle();
+            document.getElementById('soundBtn').textContent = enabled ? '🔊 声音: 开' : '🔇 声音: 关';
         }
         
         // 启动游戏
